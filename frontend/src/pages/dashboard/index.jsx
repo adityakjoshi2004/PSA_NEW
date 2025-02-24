@@ -11,7 +11,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-
+import React, { useState } from 'react';
 // project import
 import MainCard from 'components/MainCard';
 import AnalyticEcommerce from 'components/cards/statistics/AnalyticEcommerce';
@@ -21,6 +21,7 @@ import UniqueVisitorCard from './UniqueVisitorCard';
 import SaleReportCard from './SaleReportCard';
 import OrdersTable from './OrdersTable';
 import BuyData from './BuyData';
+import SellData from './SellData';
 import SellRecommendation from './SellRecommendation';
 
 // assets
@@ -52,6 +53,11 @@ const actionSX = {
 // ==============================|| DASHBOARD - DEFAULT ||============================== //
 
 export default function DashboardDefault() {
+  const [totalInvestment, setTotalInvestment] = useState(
+    localStorage.getItem('totalInvestment') || 100000
+  );
+
+
   return (
     <Grid container rowSpacing={4.5} columnSpacing={2.75}>
       {/* row 1 */}
@@ -59,16 +65,20 @@ export default function DashboardDefault() {
         <Typography variant="h5">Dashboard</Typography>
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={3}>
-        <AnalyticEcommerce title="Total Investment" count="4,42,236" percentage={59.3} extra="35,000" />
+      <AnalyticEcommerce 
+  title="Total Investment" 
+  count={totalInvestment.toLocaleString('en-IN')} 
+  
+/>
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={3}>
-        <AnalyticEcommerce title="Daily Investment" count="78,250" percentage={70.5} extra="8,900" />
+        <AnalyticEcommerce title="Daily Investment" count={totalInvestment / 40} />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={3}>
-        <AnalyticEcommerce title="Total Order" count="18,800" percentage={27.4} isLoss color="warning" extra="1,943" />
+        <AnalyticEcommerce title="NET PROFIT" count="18,800" percentage={27.4}  />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={3}>
-        <AnalyticEcommerce title="Total Sales" count="$35,078" percentage={27.4} isLoss color="warning" extra="$20,395" />
+        <AnalyticEcommerce title="TILL DATE INVESTMENT" count="₹35,078" percentage={27.4}  extra="$20,395" />
       </Grid>
 
       <Grid item md={8} sx={{ display: { sm: 'none', md: 'block', lg: 'none' } }} />
@@ -159,6 +169,22 @@ export default function DashboardDefault() {
         </Grid>
         <MainCard sx={{ mt: 2 }} content={false}>
         <BuyData />
+        </MainCard>
+     
+      </Grid>
+
+
+
+
+      <Grid item xs={15} md={8} lg={18}> 
+        <Grid container alignItems="center" justifyContent="space-between">
+          <Grid item>
+            <Typography variant="h5">SELL DATA</Typography>
+          </Grid>
+          <Grid item />
+        </Grid>
+        <MainCard sx={{ mt: 2 }} content={false}>
+        <SellData />
         </MainCard>
      
       </Grid>

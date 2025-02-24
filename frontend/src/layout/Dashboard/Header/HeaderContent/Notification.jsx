@@ -1,6 +1,4 @@
-import { useRef, useState } from 'react';
-
-// material-ui
+import { useRef, useState, useEffect } from 'react';
 import { useTheme } from '@mui/material/styles';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import Avatar from '@mui/material/Avatar';
@@ -18,19 +16,15 @@ import Popper from '@mui/material/Popper';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-
-// project import
 import MainCard from 'components/MainCard';
 import Transitions from 'components/@extended/Transitions';
-
-// assets
 import BellOutlined from '@ant-design/icons/BellOutlined';
 import CheckCircleOutlined from '@ant-design/icons/CheckCircleOutlined';
 import GiftOutlined from '@ant-design/icons/GiftOutlined';
 import MessageOutlined from '@ant-design/icons/MessageOutlined';
 import SettingOutlined from '@ant-design/icons/SettingOutlined';
 
-// sx styles
+// Notification Icon Styles
 const avatarSX = {
   width: 36,
   height: 36,
@@ -43,11 +37,8 @@ const actionSX = {
   top: 'auto',
   right: 'auto',
   alignSelf: 'flex-start',
-
   transform: 'none'
 };
-
-// ==============================|| HEADER CONTENT - NOTIFICATION ||============================== //
 
 export default function Notification() {
   const theme = useTheme();
@@ -56,6 +47,23 @@ export default function Notification() {
   const anchorRef = useRef(null);
   const [read, setRead] = useState(2);
   const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState([
+    {
+      id: 1,
+      title: "It's Cristina danny's birthday today.",
+      time: '2 min ago',
+      icon: <GiftOutlined />,
+      color: 'success'
+    },
+    {
+      id: 2,
+      title: 'Aida Burg commented on your post.',
+      time: '5 August',
+      icon: <MessageOutlined />,
+      color: 'primary'
+    }
+  ]);
+
   const handleToggle = () => {
     setOpen((prevOpen) => !prevOpen);
   };
@@ -66,6 +74,40 @@ export default function Notification() {
     }
     setOpen(false);
   };
+
+  // Market Notification Logic
+  useEffect(() => {
+    // Function to add market alert notification
+    const addMarketNotification = () => {
+      const newNotification = {
+        id: Date.now(),
+        title: 'The stock market is now open!',
+        time: 'Just now',
+        icon: <SettingOutlined />,
+        color: 'error'
+      };
+
+      setNotifications((prev) => [newNotification, ...prev]);
+      setRead((prev) => prev + 1);
+    };
+
+    // Check market opening time
+    const checkMarketOpen = () => {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+
+      // Market opening time: 9:15 AM
+      if (hours === 1 && minutes === 35) {
+        addMarketNotification();
+      }
+    };
+
+    // Set interval to check time every minute
+    const interval = setInterval(checkMarketOpen, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const iconBackColorOpen = 'grey.100';
 
@@ -106,7 +148,7 @@ export default function Notification() {
                   secondary={
                     <>
                       {read > 0 && (
-                        <Tooltip title="Mark as all read">
+                        <Tooltip title="Mark all as read">
                           <IconButton color="success" size="small" onClick={() => setRead(0)}>
                             <CheckCircleOutlined style={{ fontSize: '1.15rem' }} />
                           </IconButton>
@@ -115,125 +157,25 @@ export default function Notification() {
                     </>
                   }
                 >
-                  <List
-                    component="nav"
-                    sx={{
-                      p: 0,
-                      '& .MuiListItemButton-root': {
-                        py: 0.5,
-                        '&.Mui-selected': { bgcolor: 'grey.50', color: 'text.primary' },
-                        '& .MuiAvatar-root': avatarSX,
-                        '& .MuiListItemSecondaryAction-root': { ...actionSX, position: 'relative' }
-                      }
-                    }}
-                  >
-                    <ListItemButton selected={read > 0}>
-                      <ListItemAvatar>
-                        <Avatar sx={{ color: 'success.main', bgcolor: 'success.lighter' }}>
-                          <GiftOutlined />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Typography variant="h6">
-                            It&apos;s{' '}
-                            <Typography component="span" variant="subtitle1">
-                              Cristina danny&apos;s
-                            </Typography>{' '}
-                            birthday today.
-                          </Typography>
-                        }
-                        secondary="2 min ago"
-                      />
-                      <ListItemSecondaryAction>
-                        <Typography variant="caption" noWrap>
-                          3:00 AM
-                        </Typography>
-                      </ListItemSecondaryAction>
-                    </ListItemButton>
-                    <Divider />
-                    <ListItemButton>
-                      <ListItemAvatar>
-                        <Avatar sx={{ color: 'primary.main', bgcolor: 'primary.lighter' }}>
-                          <MessageOutlined />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Typography variant="h6">
-                            <Typography component="span" variant="subtitle1">
-                              Aida Burg
-                            </Typography>{' '}
-                            commented your post.
-                          </Typography>
-                        }
-                        secondary="5 August"
-                      />
-                      <ListItemSecondaryAction>
-                        <Typography variant="caption" noWrap>
-                          6:00 PM
-                        </Typography>
-                      </ListItemSecondaryAction>
-                    </ListItemButton>
-                    <Divider />
-                    <ListItemButton selected={read > 0}>
-                      <ListItemAvatar>
-                        <Avatar sx={{ color: 'error.main', bgcolor: 'error.lighter' }}>
-                          <SettingOutlined />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Typography variant="h6">
-                            Your Profile is Complete &nbsp;
-                            <Typography component="span" variant="subtitle1">
-                              60%
-                            </Typography>{' '}
-                          </Typography>
-                        }
-                        secondary="7 hours ago"
-                      />
-                      <ListItemSecondaryAction>
-                        <Typography variant="caption" noWrap>
-                          2:45 PM
-                        </Typography>
-                      </ListItemSecondaryAction>
-                    </ListItemButton>
-                    <Divider />
-                    <ListItemButton>
-                      <ListItemAvatar>
-                        <Avatar sx={{ color: 'primary.main', bgcolor: 'primary.lighter' }}>C</Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Typography variant="h6">
-                            <Typography component="span" variant="subtitle1">
-                              Cristina Danny
-                            </Typography>{' '}
-                            invited to join{' '}
-                            <Typography component="span" variant="subtitle1">
-                              Meeting.
+                  <List component="nav">
+                    {notifications.map((item) => (
+                      <div key={item.id}>
+                        <ListItemButton>
+                          <ListItemAvatar>
+                            <Avatar sx={{ color: `${item.color}.main`, bgcolor: `${item.color}.lighter` }}>
+                              {item.icon}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText primary={item.title} secondary={item.time} />
+                          <ListItemSecondaryAction>
+                            <Typography variant="caption" noWrap>
+                              {new Date().toLocaleTimeString()}
                             </Typography>
-                          </Typography>
-                        }
-                        secondary="Daily scrum meeting time"
-                      />
-                      <ListItemSecondaryAction>
-                        <Typography variant="caption" noWrap>
-                          9:10 PM
-                        </Typography>
-                      </ListItemSecondaryAction>
-                    </ListItemButton>
-                    <Divider />
-                    <ListItemButton sx={{ textAlign: 'center', py: `${12}px !important` }}>
-                      <ListItemText
-                        primary={
-                          <Typography variant="h6" color="primary">
-                            View All
-                          </Typography>
-                        }
-                      />
-                    </ListItemButton>
+                          </ListItemSecondaryAction>
+                        </ListItemButton>
+                        <Divider />
+                      </div>
+                    ))}
                   </List>
                 </MainCard>
               </ClickAwayListener>

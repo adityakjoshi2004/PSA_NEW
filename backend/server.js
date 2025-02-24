@@ -53,7 +53,12 @@ const copySheetToUserAccount = async () => {
   }
 };
 
+
+
+
+
 // API to fetch strategy data and copy the sheet
+
 app.get('/api/strategy-data', async (req, res) => {
   try {
     // Copy the sheet to the user's account
@@ -105,6 +110,8 @@ app.get('/api/strategy-data', async (req, res) => {
   }
 });
  
+//----------------------------------------------get buy sheet data-------------------------------------------------
+
 app.get('/api/get-buy-sheet-data', async (req, res) => {
   try {
     const response = await sheets.spreadsheets.values.get({
@@ -124,6 +131,46 @@ app.get('/api/get-buy-sheet-data', async (req, res) => {
   }
 });
 
+//------------------------------------get sell sheet data---------------------------------------------------------
+
+app.get('/api/get-sell-sheet-data', async (req, res) => {
+  try {
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: `sell!A3:J`, // Adjust the range based on your sheet layout
+    });
+
+    const rows = response.data.values;
+console.log(rows);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ message: 'No data found in the sheet.' });
+    }
+
+    // Map rows to meaningful data structure
+    const result = rows.slice(1).map(row => ({
+     
+      buyDate: row[0] || '',
+      etfCode: row[1] || '',
+      underlyingAsset: row[2] || '',
+      actualShare: row[3] || '',
+      buyPrice: row[4] || '',
+      suggestedShare: row[5] || '',
+      investedAmt: row[6] || '',
+      sellPrice: row[7] || '',
+      sellDate: row[8] || '',
+      investedAmount: row[9] || '',
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    res.status(500).json({ error: 'Failed to fetch sheet data.' });
+  }
+});
+
+
+//-----------------------------------------------------handle buy strategy---------------------------------------------
+
 // API endpoint to handle buy operation
 app.post('/api/buy', async (req, res) => {
   const { stockDetails, cmp, shares, selectedShares, buyPrice, date } = req.body;
@@ -139,8 +186,8 @@ app.post('/api/buy', async (req, res) => {
     // Prepare data in the correct order for Google Sheets
     const buyData = [[date, cmp, stockCode, shares, buyPrice, selectedShares]];
 
-    console.log('Received Data:', req.body);
-    console.log('Formatted Data for Sheets:', buyData);
+    // console.log('Received Data:', req.body);
+    // console.log('Formatted Data for Sheets:', buyData);
 
     // Append data to Google Sheets
     const response = await sheets.spreadsheets.values.append({
@@ -152,7 +199,7 @@ app.post('/api/buy', async (req, res) => {
       },
     });
 
-    console.log('Data successfully appended to Google Sheets:', response.data);
+    // console.log('Data successfully appended to Google Sheets:', response.data);
     res.status(200).json({
       message: `Successfully bought ${selectedShares} shares of ${stockCode} at CMP ${cmp} with Buy Price ${buyPrice}.`,
     });
@@ -161,6 +208,12 @@ app.post('/api/buy', async (req, res) => {
     res.status(500).json({ error: 'Failed to execute the buy operation.' });
   }
 });
+
+
+
+
+//-----------------------------------------SELL RECOMMENDATION SHEEt----------------------------------
+
 
 app.get('/api/sell-recommendations', async (req, res) => {
   try {
@@ -201,10 +254,10 @@ app.get('/api/sell-recommendations', async (req, res) => {
     const sellRecommendations = [];
 
     buySheetData.forEach((row) => {
-      const [date, buyCMP, stockCode, shares, buyPrice] = row;
+      const [date, buyCMP, stockCode, shares, buyPrice, selectedShares] = row;
 
       // Ensure data is valid
-      if (!date || !buyCMP || !stockCode || !shares || !buyPrice) {
+      if (!date || !buyCMP || !stockCode || !shares || !buyPrice || !selectedShares) {
         console.warn('⚠️ Skipping row due to missing data:', row);
         return;
       }
@@ -226,15 +279,15 @@ app.get('/api/sell-recommendations', async (req, res) => {
           }
 
           if (currentCMP >= cleanBuyCMP * 1.02) {
-            console.log(`📌 ${stockCode} triggered sell: BuyCMP = ${cleanBuyCMP}, CurrentCMP = ${currentCMP}`);
+            // console.log(`📌 ${stockCode} triggered sell: BuyCMP = ${cleanBuyCMP}, CurrentCMP = ${currentCMP}`);
 
             sellRecommendations.push({
               date,
               stockCode,
               buyPrice: cleanBuyCMP,
               currentCMP,
-              shares,
-              recommendation: `Sell ${shares} shares of ${stockCode}`,
+              selectedShares,
+              recommendation: `Sell ${selectedShares} shares of ${stockCode}`,
             });
           }
         }
@@ -251,7 +304,11 @@ app.get('/api/sell-recommendations', async (req, res) => {
 });
 
 
-//sell sheet data 
+
+
+//--------------------------------------sell  data --------------------------------------
+
+
 app.post('/api/sell', async (req, res) => {
   try {
     console.log('Received sell request:', req.body); // ✅ Check incoming request data
@@ -260,6 +317,26 @@ app.post('/api/sell', async (req, res) => {
     if (!etfCode || !sellPrice || !sellDate) {
       return res.status(400).json({ error: 'Missing required data' });
     }
+
+    // 🛑 Fetch "Equity ETF Shop" to get underlying asset
+    const etfShopResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Equity ETF Shop!A2:B' // ✅ Start from A2 to get correct headers & data
+    });
+
+    const etfShopData = etfShopResponse.data.values || [];
+    console.log('Fetched ETF Shop data:', etfShopData); // ✅ Debugging ETF Shop
+
+    let underlyingAsset = 'N/A';
+
+    // 🛑 Skip the first row (headers) and match ETF Code correctly
+    etfShopData.slice(1).forEach((row) => {
+      if (row[0] === etfCode) {
+        underlyingAsset = row[1]; // ✅ Get the corresponding underlying asset
+      }
+    });
+
+    console.log(`✅ Found underlying asset for ${etfCode}: ${underlyingAsset}`);
 
     // 🛑 Fetch buy sheet data
     const buySheetResponse = await sheets.spreadsheets.values.get({
@@ -275,16 +352,15 @@ app.post('/api/sell', async (req, res) => {
 
     // Find matching row in buy sheet
     buySheetData.forEach((row, index) => {
-      if (row[2] === etfCode) { // Adjust index based on actual buy sheet columns
-        buyRowIndex = index + 3; 
+      if (row[2] === etfCode) {
+        buyRowIndex = index + 3;
         buyEntry = {
           buyDate: row[0] || 'N/A',
-          underlyingAsset: row[1] || 'N/A',
           buyPrice: parseFloat(row[3]) || 0,
           actualBuyQty: parseInt(row[4]) || 0,
           suggestedQty: parseInt(row[5]) || 0,
           investedAmount: parseFloat(row[3]) * parseInt(row[4]) || 0,
-          investedAmountOnSellDate: parseFloat(sellPrice) * parseInt(row[4]) || 0
+          investedAmountOnSellDate: parseFloat(sellPrice) * parseInt(row[5]) || 0
         };
       }
     });
@@ -300,7 +376,7 @@ app.post('/api/sell', async (req, res) => {
     const sellData = [[
       buyEntry.buyDate,
       etfCode,
-      buyEntry.underlyingAsset,
+      underlyingAsset, // ✅ Now correctly fetched from Equity ETF Shop
       buyEntry.buyPrice,
       buyEntry.actualBuyQty,
       buyEntry.suggestedQty,
@@ -319,15 +395,35 @@ app.post('/api/sell', async (req, res) => {
 
     console.log(`✅ Sell data for ${etfCode} recorded successfully.`);
 
+
+
+
+
+
     // 🛑 Delete from "buy" sheet
     if (buyRowIndex !== -1) {
+      // Fetch metadata for the sheet to get the numeric sheetId
+      const sheetMetadataResponse = await sheets.spreadsheets.get({
+        spreadsheetId: SHEET_ID
+      });
+
+      const buySheet = sheetMetadataResponse.data.sheets.find(
+        sheet => sheet.properties.title === 'buy'
+      );
+
+      if (!buySheet) {
+        return res.status(404).json({ error: 'Buy sheet not found' });
+      }
+
+      const sheetId = buySheet.properties.sheetId;
+
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SHEET_ID,
         resource: {
           requests: [{
             deleteDimension: {
               range: {
-                sheetId: SHEET_ID,
+                sheetId: sheetId, // ✅ Correct numeric sheetId
                 dimension: 'ROWS',
                 startIndex: buyRowIndex - 1,
                 endIndex: buyRowIndex
@@ -349,7 +445,6 @@ app.post('/api/sell', async (req, res) => {
     res.status(500).json({ error: 'Failed to process the sell transaction.' });
   }
 });
-
 
 // API endpoint to handle delete operation (specific to columns A to E)
 app.delete('/api/delete/:stockCode', async (req, res) => {

@@ -74,7 +74,7 @@ export default function SellRecommendation() {
                   <TableCell>
                     <NumericFormat value={row.currentCMP} displayType="text" thousandSeparator prefix="₹" />
                   </TableCell>
-                  <TableCell>{row.shares}</TableCell>
+                  <TableCell>{row.selectedShares}</TableCell>
                   <TableCell>{row.recommendation}</TableCell>
                   <TableCell>
                   <Button 
