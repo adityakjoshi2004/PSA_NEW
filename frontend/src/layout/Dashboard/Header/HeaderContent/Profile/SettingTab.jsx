@@ -5,23 +5,23 @@ import { CommentOutlined, LockOutlined, QuestionCircleOutlined, UserOutlined, Un
 export default function SettingTab() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [investment, setInvestment] = useState(localStorage.getItem('totalInvestment') || 100000);
-  const [profit, setprofit] = useState(localStorage.getItem('profitpercent') || 1.02);
+  const [profit, setProfit] = useState(localStorage.getItem('profitPercent') || 2); // Default 2%
 
   useEffect(() => {
-     setInvestment(localStorage.getItem('totalInvestment') || 100000);
-    setprofit(localStorage.getItem('profitpercent') || 1.02);
+    setInvestment(localStorage.getItem('totalInvestment') || 100000);
+    setProfit(localStorage.getItem('profitPercent') || 2);
   }, []);
 
-  console.log(profit);
+  console.log(`Profit Percentage: ${profit}%`);
 
-  const handleSave = () => {
+  const handleSaveInvestment = () => {
     localStorage.setItem('totalInvestment', investment);
     alert('Investment amount saved!');
   };
 
-  const handleprofit = () => {
-    localStorage.setItem('profitpercent', profit);
-    alert('Your profit percent and sell recommendation will depend on this!!!');
+  const handleSaveProfit = () => {
+    localStorage.setItem('profitPercent', profit);
+    alert('Your sell recommendation will now use this profit percentage!');
   };
 
   return (
@@ -50,38 +50,40 @@ export default function SettingTab() {
       </List>
 
       {selectedIndex === 1 && (
-          <Box>
-        <Box sx={{ mt: 3, p: 2, border: '1px solid #ccc', borderRadius: 2 }}>
-          <Typography variant="h6">Investment Settings</Typography>
-          <TextField
-            label="Total Investment"
-            type="number"
-            fullWidth
-            value={investment}
-            onChange={(e) => setInvestment(e.target.value)}
-            sx={{ my: 2 }}
-          />
-          <Button variant="contained" color="primary" fullWidth onClick={handleSave}>
-            Save Investment
-          </Button>
-          </Box>
+        <Box>
+          {/* Investment Settings */}
           <Box sx={{ mt: 3, p: 2, border: '1px solid #ccc', borderRadius: 2 }}>
-        <Typography variant="h6">Profit Percentage</Typography>
-        <TextField
-        label="set percentage profit"
-        type="number"
-        fullWidth
-        value={profit}
-        onChange={(e) => setprofit(e.target.value)}
-        sx={{ my : 2 } }
-        />
-       <Button variant="contained" color="primary" fullWidth onClick={handleprofit}>
-        Save
-       </Button>
-       </Box>
+            <Typography variant="h6">Investment Settings</Typography>
+            <TextField
+              label="Total Investment"
+              type="number"
+              fullWidth
+              value={investment}
+              onChange={(e) => setInvestment(e.target.value)}
+              sx={{ my: 2 }}
+            />
+            <Button variant="contained" color="primary" fullWidth onClick={handleSaveInvestment}>
+              Save Investment
+            </Button>
+          </Box>
+
+          {/* Profit Percentage Settings */}
+          <Box sx={{ mt: 3, p: 2, border: '1px solid #ccc', borderRadius: 2 }}>
+            <Typography variant="h6">Profit Percentage</Typography>
+            <TextField
+              label="Set Profit Percentage (%)"
+              type="number"
+              fullWidth
+              value={profit}
+              onChange={(e) => setProfit(e.target.value)}
+              sx={{ my: 2 }}
+            />
+            <Button variant="contained" color="primary" fullWidth onClick={handleSaveProfit}>
+              Save Profit Percentage
+            </Button>
+          </Box>
+        </Box>
+      )}
     </Box>
-    
-  )}
-  </Box>
   );
 }

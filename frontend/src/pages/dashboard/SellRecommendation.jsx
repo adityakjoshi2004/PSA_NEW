@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Typography, Box, Button
+  Typography, Box, Button, TextField
 } from '@mui/material';
 import { NumericFormat } from 'react-number-format';
 
@@ -10,11 +10,13 @@ export default function SellRecommendation() {
   const [sellRecommendations, setSellRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [brokerageFees, setBrokerageFees] = useState({}); // Store brokerage fees per row
 
   useEffect(() => {
     const fetchSellRecommendations = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/sell-recommendations');
+        const profitPercent = localStorage.getItem('profitPercent') || 2; // Default 2%
+        const response = await axios.get(`http://localhost:5000/api/sell-recommendations?profitPercent=${profitPercent}`);
         setSellRecommendations(response.data.sellRecommendations);
         setLoading(false);
       } catch (err) {
@@ -26,16 +28,17 @@ export default function SellRecommendation() {
     fetchSellRecommendations();
   }, []);
 
-
   const handleSell = async (etfCode, sellPrice) => {
+    const brokerage = brokerageFees[etfCode] || 0; // Default to 0 if not entered
     try {
       const sellDate = new Date().toISOString().split('T')[0]; // Get current date
       const response = await axios.post('http://localhost:5000/api/sell', {
         etfCode,
         sellPrice,
-        sellDate
+        sellDate,
+        brokerageFees: parseFloat(brokerage) // Convert to number
       });
-  
+
       alert(response.data.message);
       window.location.reload(); // Refresh after selling
     } catch (error) {
@@ -43,14 +46,12 @@ export default function SellRecommendation() {
       alert('Sell request failed. Please try again.');
     }
   };
-  
 
   if (loading) return <Typography>Loading...</Typography>;
   if (error) return <Typography>Error fetching data</Typography>;
 
   return (
     <Box>
-
       <TableContainer>
         <Table>
           <TableHead>
@@ -60,7 +61,8 @@ export default function SellRecommendation() {
               <TableCell sx={{ color: 'white' }}>Current CMP</TableCell>
               <TableCell sx={{ color: 'white' }}>Shares</TableCell>
               <TableCell sx={{ color: 'white' }}>Recommendation</TableCell>
-              <TableCell sx={{ color: 'white'}}>Action</TableCell>
+              <TableCell sx={{ color: 'white' }}>Brokerage Fees</TableCell>
+              <TableCell sx={{ color: 'white' }}>Action</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -77,20 +79,33 @@ export default function SellRecommendation() {
                   <TableCell>{row.selectedShares}</TableCell>
                   <TableCell>{row.recommendation}</TableCell>
                   <TableCell>
-                  <Button 
-                    variant="contained" 
-                    color="success" 
-                    size="small" 
-                    onClick={() => handleSell(row.stockCode, row.currentCMP)}>
-                    SELL
-                  </Button>
-
+                    <TextField
+                      type="number"
+                      size="small"
+                      variant="outlined"
+                      label="₹ Brokerage"
+                      value={brokerageFees[row.stockCode] || ''}
+                      onChange={(e) => setBrokerageFees({
+                        ...brokerageFees,
+                        [row.stockCode]: e.target.value
+                      })}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      size="small"
+                      onClick={() => handleSell(row.stockCode, row.currentCMP)}
+                    >
+                      SELL
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} align="center">No Sell Recommendations</TableCell>
+                <TableCell colSpan={7} align="center">No Sell Recommendations</TableCell>
               </TableRow>
             )}
           </TableBody>

@@ -59,7 +59,7 @@ export default function AnalyticEcommerce({ color = 'primary', title, count, per
 AnalyticEcommerce.propTypes = {
   color: PropTypes.string,
   title: PropTypes.string,
-  count: PropTypes.string,
+  count: PropTypes.oneOfType([PropTypes.string,PropTypes.number]),
   percentage: PropTypes.number,
   isLoss: PropTypes.bool,
   extra: PropTypes.string

@@ -217,84 +217,61 @@ app.post('/api/buy', async (req, res) => {
 
 app.get('/api/sell-recommendations', async (req, res) => {
   try {
+    // Get profitPercent from query params, fallback to 2% if not provided
+    const profitPercent = parseFloat(req.query.profitPercent) ;
+    const profitMultiplier = 1 + profitPercent / 100;
+
     // 1️⃣ Fetch Buy Sheet Data
     const buySheetResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'buy!A3:F', // Ensure this contains Date, CMP, Stock Code, Shares, Buy Price, Selected Shares
+      range: 'buy!A3:F', 
     });
 
     const buySheetData = buySheetResponse.data.values || [];
-    console.log('📊 Buy Sheet Data:', buySheetData);
-
-    if (!buySheetData.length) {
-      return res.status(200).json({ sellRecommendations: [] });
-    }
+    if (!buySheetData.length) return res.status(200).json({ sellRecommendations: [] });
 
     // 2️⃣ Fetch ETF Equity Shop Data
     const etfResponse = await axios.get(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${STOCK_CODE_RANGE}?key=${API_KEY}`
     );
-
     const etfStockCodes = etfResponse.data.values || [];
-    console.log('📈 ETF Stock Codes:', JSON.stringify(etfResponse.data, null, 2));
 
     // 3️⃣ Fetch Current CMP Data
     const cmpResponse = await axios.get(
       `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${CMP_RANGE}?key=${API_KEY}`
     );
-
     const cmpData = cmpResponse.data.values || [];
-    console.log('💰 CMP Data:', JSON.stringify(cmpResponse.data, null, 2));
 
-    if (!etfStockCodes.length || !cmpData.length) {
-      return res.status(200).json({ sellRecommendations: [] });
-    }
+    if (!etfStockCodes.length || !cmpData.length) return res.status(200).json({ sellRecommendations: [] });
 
-    // 4️⃣ Calculate Sell Recommendations
-    const sellRecommendations = [];
-
-    buySheetData.forEach((row) => {
-      const [date, buyCMP, stockCode, shares, buyPrice, selectedShares] = row;
-
-      // Ensure data is valid
-      if (!date || !buyCMP || !stockCode || !shares || !buyPrice || !selectedShares) {
-        console.warn('⚠️ Skipping row due to missing data:', row);
-        return;
-      }
-
-      const cleanBuyCMP = parseFloat(buyPrice);
-      if (isNaN(cleanBuyCMP)) {
-        console.warn('⚠️ Invalid Buy CMP for:', stockCode);
-        return;
-      }
-
-      etfStockCodes.forEach((etfRow, index) => {
-        if (etfRow[0] === stockCode) {
-          const cmpRow = cmpData[index] || [];
-          const currentCMP = parseFloat(cmpRow[0]);
-
-          if (!cmpRow.length || isNaN(currentCMP)) {
-            console.warn(`⚠️ Missing CMP data for stock: ${stockCode}, skipping...`);
-            return;
-          }
-
-          if (currentCMP >= cleanBuyCMP * 1.02) {
-            // console.log(`📌 ${stockCode} triggered sell: BuyCMP = ${cleanBuyCMP}, CurrentCMP = ${currentCMP}`);
-
-            sellRecommendations.push({
-              date,
-              stockCode,
-              buyPrice: cleanBuyCMP,
-              currentCMP,
-              selectedShares,
-              recommendation: `Sell ${selectedShares} shares of ${stockCode}`,
-            });
-          }
-        }
-      });
+    // Create a map for stock CMP values
+    const stockCMPMap = new Map();
+    etfStockCodes.forEach((etfRow, index) => {
+      if (etfRow[0]) stockCMPMap.set(etfRow[0], parseFloat(cmpData[index]?.[0]));
     });
 
-    console.log('✅ Sell Recommendations:', sellRecommendations);
+    // 4️⃣ Calculate Sell Recommendations
+    const sellRecommendations = buySheetData
+      .map((row) => {
+        const [date, buyCMP, stockCode, shares, buyPrice, selectedShares] = row;
+        if (!date || !buyCMP || !stockCode || !shares || !buyPrice || !selectedShares) return null;
+
+        const cleanBuyCMP = parseFloat(buyPrice);
+        const currentCMP = stockCMPMap.get(stockCode);
+
+        if (!isNaN(cleanBuyCMP) && !isNaN(currentCMP) && currentCMP >= cleanBuyCMP * profitMultiplier) {
+          return {
+            date,
+            stockCode,
+            buyPrice: cleanBuyCMP,
+            currentCMP,
+            selectedShares,
+            recommendation: `Sell ${selectedShares} shares of ${stockCode}`,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
 
     res.status(200).json({ sellRecommendations });
   } catch (error) {
@@ -304,8 +281,6 @@ app.get('/api/sell-recommendations', async (req, res) => {
 });
 
 
-
-
 //--------------------------------------sell  data --------------------------------------
 
 
@@ -313,8 +288,8 @@ app.post('/api/sell', async (req, res) => {
   try {
     console.log('Received sell request:', req.body); // ✅ Check incoming request data
 
-    const { etfCode, sellPrice, sellDate } = req.body;
-    if (!etfCode || !sellPrice || !sellDate) {
+    const { etfCode, sellPrice, sellDate,brokerageFees } = req.body;
+    if (!etfCode || !sellPrice || !sellDate || brokerageFees === undefined) {
       return res.status(400).json({ error: 'Missing required data' });
     }
 
@@ -383,12 +358,14 @@ app.post('/api/sell', async (req, res) => {
       buyEntry.investedAmount,
       sellPrice,
       sellDate,
-      buyEntry.investedAmountOnSellDate
+      buyEntry.investedAmountOnSellDate,
+      "", "", "", // ✅ Adding empty values for columns K, L, M (Skipping them)
+      brokerageFees
     ]];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'sell!A3:J',
+      range: 'sell!A3:N',
       valueInputOption: 'USER_ENTERED',
       resource: { values: sellData }
     });
@@ -447,6 +424,8 @@ app.post('/api/sell', async (req, res) => {
 });
 
 // API endpoint to handle delete operation (specific to columns A to E)
+
+
 app.delete('/api/delete/:stockCode', async (req, res) => {
     const { stockCode } = req.params; // Correctly retrieve stockCode from URL parameters
     console.log(`Stock code to delete: ${stockCode}`);
