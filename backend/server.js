@@ -286,9 +286,9 @@ app.get('/api/sell-recommendations', async (req, res) => {
 
 app.post('/api/sell', async (req, res) => {
   try {
-    console.log('Received sell request:', req.body); // ✅ Check incoming request data
+    console.log('Received sell request:', req.body);
 
-    const { etfCode, sellPrice, sellDate,brokerageFees } = req.body;
+    const { etfCode, sellPrice, sellDate, brokerageFees } = req.body; // ✅ Added brokerageFees
     if (!etfCode || !sellPrice || !sellDate || brokerageFees === undefined) {
       return res.status(400).json({ error: 'Missing required data' });
     }
@@ -334,7 +334,7 @@ app.post('/api/sell', async (req, res) => {
           buyPrice: parseFloat(row[3]) || 0,
           actualBuyQty: parseInt(row[4]) || 0,
           suggestedQty: parseInt(row[5]) || 0,
-          investedAmount: parseFloat(row[3]) * parseInt(row[4]) || 0,
+          investedAmount: parseFloat(row[4]) * parseInt(row[3]) || 0,
           investedAmountOnSellDate: parseFloat(sellPrice) * parseInt(row[5]) || 0
         };
       }
@@ -349,23 +349,23 @@ app.post('/api/sell', async (req, res) => {
 
     // Insert into "sell" sheet
     const sellData = [[
-      buyEntry.buyDate,
-      etfCode,
-      underlyingAsset, // ✅ Now correctly fetched from Equity ETF Shop
-      buyEntry.buyPrice,
-      buyEntry.actualBuyQty,
-      buyEntry.suggestedQty,
-      buyEntry.investedAmount,
-      sellPrice,
-      sellDate,
-      buyEntry.investedAmountOnSellDate,
+      buyEntry.buyDate, // A
+      etfCode, // B
+      underlyingAsset, // C
+      buyEntry.buyPrice, // D
+      buyEntry.actualBuyQty, // E
+      buyEntry.suggestedQty, // F
+      buyEntry.investedAmount, // G
+      sellPrice, // H
+      sellDate, // I
+      buyEntry.investedAmountOnSellDate, // J
       "", "", "", // ✅ Adding empty values for columns K, L, M (Skipping them)
-      brokerageFees
+      brokerageFees // ✅ Placing brokerage fees in column N
     ]];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'sell!A3:N',
+      range: 'sell!A3:N', // ✅ Now explicitly setting N as the last column
       valueInputOption: 'USER_ENTERED',
       resource: { values: sellData }
     });
@@ -422,6 +422,85 @@ app.post('/api/sell', async (req, res) => {
     res.status(500).json({ error: 'Failed to process the sell transaction.' });
   }
 });
+
+// API endpoint to handle delete operation (specific to columns A to E)
+app.delete('/api/delete/:stockCode', async (req, res) => {
+    const { stockCode } = req.params; // Correctly retrieve stockCode from URL parameters
+    console.log(`Stock code to delete: ${stockCode}`);
+    
+    if (!stockCode) {
+      return res.status(400).json({ error: 'Missing stockCode in the request' });
+    }
+  
+    try {
+      // Fetch the sheet metadata to get the sheetId (by fetching all sheet info)
+      const sheetMetadataResponse = await sheets.spreadsheets.get({
+        spreadsheetId: SHEET_ID,
+      });
+  
+      // Ensure the sheet exists and retrieve the sheetId
+      const sheet = sheetMetadataResponse.data.sheets.find(sheet => sheet.properties.title === 'buy'); // Corrected sheet name to lowercase 'buy'
+      if (!sheet) {
+        return res.status(404).json({ error: 'Sheet named buy not found' });
+      }
+  
+      const sheetId = sheet.properties.sheetId; // Sheet ID for the 'buy' sheet
+      console.log('Sheet ID:', sheetId); // Debugging to verify sheetId
+  
+      // Fetch the entire sheet data from columns A to E using axios
+      const sheetResponse = await sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_ID,
+        range: 'buy!A:E', // Adjust the range to cover columns A to E
+      });
+  
+      const rows = sheetResponse.data.values || [];
+      console.log('Fetched rows from sheet:', rows); // Debugging fetched rows
+  
+      let rowIndexToDelete = -1;
+  
+      // Find the row index where the stockCode matches (assuming stockCode is in column D)
+      rows.forEach((row, index) => {
+        if (row[3] && row[3] === stockCode) { // Column D is the 4th column (index 3)
+          rowIndexToDelete = index + 1; // Adjust index to match row number in the sheet (considering headers)
+        }
+      });
+  
+      if (rowIndexToDelete === -1) {
+        return res.status(404).json({ error: `Row with stockCode ${stockCode} not found`});
+      }
+  
+      // Use batchUpdate to delete the row
+      const request = {
+        spreadsheetId: SHEET_ID,
+        resource: {
+          requests: [
+            {
+              deleteDimension: {
+                range: {
+                  sheetId: sheetId, // Correct sheetId here
+                  dimension: 'ROWS',
+                  startIndex: rowIndexToDelete - 1, // Zero-based index
+                  endIndex: rowIndexToDelete, // End index is exclusive
+                },
+              },
+            },
+          ],
+        },
+      };
+  
+      const response = await sheets.spreadsheets.batchUpdate(request);
+      console.log('Row deleted successfully:', response.data);
+  
+      res.status(200).json({
+        message: `Successfully deleted the row with stockCode ${stockCode}.`,
+      });
+    } catch (error) {
+      console.error('Error deleting row from Google Sheets:', error);
+      res.status(500).json({ error: 'Failed to delete the row.' });
+    }
+  });
+  
+
 
 // API endpoint to handle delete operation (specific to columns A to E)
 
@@ -600,4 +679,6 @@ app.put('/api/update', async (req, res) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  
 });
+  
