@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json()); // Parse JSON request bodies
 
-const SHEET_ID2 = '1S0gvUBlUNKkt-ho_IOXFOQaLev1x3JpWH5Toqj5-tgw'; // Google Sheet ID
+const SHEET_ID2 = 'YOUR SHEET ID'; // Google Sheet ID
 const RANGE = 'buy!A3:F';// Range to append data
 
 // Google API OAuth setup
