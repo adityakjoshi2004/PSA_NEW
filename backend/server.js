@@ -12,8 +12,8 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json()); // Parse JSON request bodies
 
-const SHEET_ID2 = 'YOUR SHEET ID'; // Google Sheet ID
-const RANGE = 'buy!A3:F';// Range to append data
+const SHEET_ID2 = '1S0gvUBlUNKkt-ho_IOXFOQaLev1x3JpWH5Toqj5-tgw'; // Google Sheet ID
+const RANGE = 'buy!A6:F';// Range to append data
 
 // Google API OAuth setup
 const auth = new google.auth.GoogleAuth({
@@ -137,7 +137,7 @@ app.get('/api/get-sell-sheet-data', async (req, res) => {
   try {
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: `sell!A3:J`, // Adjust the range based on your sheet layout
+      range: `sell!A3:L`, // Adjust the range based on your sheet layout
     });
 
     const rows = response.data.values;
@@ -159,6 +159,8 @@ console.log(rows);
       sellPrice: row[7] || '',
       sellDate: row[8] || '',
       investedAmount: row[9] || '',
+      sharesSold: row[10] || '',
+      sharesLeft: row[11] || '',
     }));
 
     res.json(result);
@@ -192,7 +194,7 @@ app.post('/api/buy', async (req, res) => {
     // Append data to Google Sheets
     const response = await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'buy!A3:F', // Ensure this matches the correct sheet name
+      range: 'buy!A6:F', // Ensure this matches the correct sheet name
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: buyData,
@@ -224,7 +226,7 @@ app.get('/api/sell-recommendations', async (req, res) => {
     // 1️⃣ Fetch Buy Sheet Data
     const buySheetResponse = await sheets.spreadsheets.values.get({
       spreadsheetId: SHEET_ID,
-      range: 'buy!A3:F', 
+      range: 'buy!A6:F', 
     });
 
     const buySheetData = buySheetResponse.data.values || [];
@@ -288,8 +290,8 @@ app.post('/api/sell', async (req, res) => {
   try {
     console.log('Received sell request:', req.body);
 
-    const { etfCode, sellPrice, sellDate, brokerageFees } = req.body; // ✅ Added brokerageFees
-    if (!etfCode || !sellPrice || !sellDate || brokerageFees === undefined) {
+    const { etfCode, sellPrice, sellDate,shares, brokerageFees } = req.body; // ✅ Added brokerageFees
+    if (!etfCode || !sellPrice || !sellDate || !shares || brokerageFees === undefined) {
       return res.status(400).json({ error: 'Missing required data' });
     }
 
@@ -331,9 +333,9 @@ app.post('/api/sell', async (req, res) => {
         buyRowIndex = index + 3;
         buyEntry = {
           buyDate: row[0] || 'N/A',
-          buyPrice: parseFloat(row[3]) || 0,
-          actualBuyQty: parseInt(row[4]) || 0,
-          suggestedQty: parseInt(row[5]) || 0,
+          buyPrice: parseFloat(row[4]) || 0,
+          actualBuyQty: parseInt(row[5]) || 0,
+          suggestedQty: parseInt(row[3]) || 0,
           investedAmount: parseFloat(row[4]) * parseInt(row[3]) || 0,
           investedAmountOnSellDate: parseFloat(sellPrice) * parseInt(row[5]) || 0
         };
@@ -352,20 +354,24 @@ app.post('/api/sell', async (req, res) => {
       buyEntry.buyDate, // A
       etfCode, // B
       underlyingAsset, // C
-      buyEntry.buyPrice, // D
-      buyEntry.actualBuyQty, // E
+      buyEntry.actualBuyQty, // D
+      buyEntry.buyPrice, // E
       buyEntry.suggestedQty, // F
       buyEntry.investedAmount, // G
       sellPrice, // H
       sellDate, // I
       buyEntry.investedAmountOnSellDate, // J
-      "", "", "", // ✅ Adding empty values for columns K, L, M (Skipping them)
+      shares, //K
+      buyEntry.actualBuyQty - shares, //K
+      // "", "", "", // ✅ Adding empty values for columns K, L, M (Skipping them)
       brokerageFees // ✅ Placing brokerage fees in column N
+      // "", "", "","", "", "","", "", "","", //skip tp x
+      // buyEntry.actualBuyQty - shares
     ]];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'sell!A3:N', // ✅ Now explicitly setting N as the last column
+      range: 'sell!A3:M', // ✅ Now explicitly setting N as the last column
       valueInputOption: 'USER_ENTERED',
       resource: { values: sellData }
     });
@@ -379,6 +385,8 @@ app.post('/api/sell', async (req, res) => {
 
     // 🛑 Delete from "buy" sheet
     if (buyRowIndex !== -1) {
+      if(shares == buyEntry.actualBuyQty ){
+      console.log("I am here");
       // Fetch metadata for the sheet to get the numeric sheetId
       const sheetMetadataResponse = await sheets.spreadsheets.get({
         spreadsheetId: SHEET_ID
@@ -411,6 +419,19 @@ app.post('/api/sell', async (req, res) => {
       });
 
       console.log(`✅ Deleted ${etfCode} from buy sheet.`);
+    } else {
+      console.log("Now i am here");
+      // Update actualBuyQty column if not all shares are sold
+      const updatedQty = buyEntry.actualBuyQty - shares;
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `buy!F${buyRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [[updatedQty]] }
+      });
+
+      console.log(`✅ Updated actualBuyQty for ${etfCode} to ${updatedQty}.`);
+    }
     }
 
     res.status(200).json({
@@ -673,7 +694,29 @@ app.put('/api/update', async (req, res) => {
 
 
 
+app.get('/api/get-buy-sell-data', async (req, res) => {
+  try {
+    // Fetch G2 from "Buy" sheet
+    const buyResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Buy!G2'
+    });
 
+    // Fetch T2 from "Sell" sheet
+    const sellResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Sell!T2'
+    });
+
+    const buyValue = buyResponse.data.values ? buyResponse.data.values[0][0] : null;
+    const sellValue = sellResponse.data.values ? sellResponse.data.values[0][0] : null;
+
+    res.status(200).json({ buyG2: buyValue, sellT2: sellValue });
+  } catch (error) {
+    console.error('Error fetching sheet data:', error);
+    res.status(500).json({ error: 'Failed to fetch data from the sheets' });
+  }
+});
 
 // Start the server
 const PORT = process.env.PORT || 5000;
@@ -681,4 +724,3 @@ app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   
 });
-  

@@ -32,6 +32,8 @@ function SellData() {
                 <TableCell sx={{ color: 'white' }}>Invested Amount</TableCell>
                 <TableCell sx={{ color: 'white' }}>Sell Price</TableCell>
                 <TableCell sx={{ color: 'white' }}>Sell Date</TableCell>
+                <TableCell sx={{ color: 'white' }}>Shares Sold</TableCell>
+                <TableCell sx={{ color: 'white' }}>Shares Remaining</TableCell>
                 <TableCell sx={{ color: 'white' }}>Invested Amt Till This Date</TableCell>
               </TableRow>
             </TableHead>
@@ -47,6 +49,8 @@ function SellData() {
                   <TableCell>{row.investedAmt}</TableCell>
                   <TableCell>{row.sellPrice}</TableCell>
                   <TableCell>{row.sellDate}</TableCell>
+                  <TableCell>{row.sharesSold}</TableCell>
+                  <TableCell>{row.sharesLeft}</TableCell>
                   <TableCell>{row.investedAmount}</TableCell>
                 </TableRow>
               ))}

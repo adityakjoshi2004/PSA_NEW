@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Typography, Box, Button, TextField
+  Typography, Box, Button, TextField, Modal
 } from '@mui/material';
 import { NumericFormat } from 'react-number-format';
 
@@ -10,12 +10,15 @@ export default function SellRecommendation() {
   const [sellRecommendations, setSellRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [brokerageFees, setBrokerageFees] = useState({}); // Store brokerage fees per row
+  const [brokerageFees, setBrokerageFees] = useState({});
+  const [open, setOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [shareCount, setShareCount] = useState(0);
 
   useEffect(() => {
     const fetchSellRecommendations = async () => {
       try {
-        const profitPercent = localStorage.getItem('profitPercent') || 2; // Default 2%
+        const profitPercent = localStorage.getItem('profitPercent') || 2;
         const response = await axios.get(`http://localhost:5000/api/sell-recommendations?profitPercent=${profitPercent}`);
         setSellRecommendations(response.data.sellRecommendations);
         setLoading(false);
@@ -28,19 +31,26 @@ export default function SellRecommendation() {
     fetchSellRecommendations();
   }, []);
 
-  const handleSell = async (etfCode, sellPrice) => {
-    const brokerage = brokerageFees[etfCode] || 0; // Default to 0 if not entered
-    try {
-      const sellDate = new Date().toISOString().split('T')[0]; // Get current date
-      const response = await axios.post('http://localhost:5000/api/sell', {
-        etfCode,
-        sellPrice,
-        sellDate,
-        brokerageFees: parseFloat(brokerage) // Convert to number
-      });
+  const handleSellClick = (row) => {
+    setSelectedRow(row);
+    setShareCount(row.selectedShares);
+    setOpen(true);
+  };
 
+  const handleConfirmSell = async () => {
+    if (!selectedRow) return;
+    try {
+      const sellDate = new Date().toISOString().split('T')[0];
+      const response = await axios.post('http://localhost:5000/api/sell', {
+        etfCode: selectedRow.stockCode,
+        sellPrice: selectedRow.currentCMP,
+        sellDate,
+        shares: shareCount,
+        brokerageFees: parseFloat(brokerageFees[selectedRow.stockCode] || 0)
+      });
       alert(response.data.message);
-      window.location.reload(); // Refresh after selling
+      setOpen(false);
+      window.location.reload();
     } catch (error) {
       console.error('Sell request failed:', error);
       alert('Sell request failed. Please try again.');
@@ -96,7 +106,7 @@ export default function SellRecommendation() {
                       variant="contained"
                       color="success"
                       size="small"
-                      onClick={() => handleSell(row.stockCode, row.currentCMP)}
+                      onClick={() => handleSellClick(row)}
                     >
                       SELL
                     </Button>
@@ -111,6 +121,60 @@ export default function SellRecommendation() {
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Modal for Sell Summary */}
+      {/* Modal for Sell Summary */}
+      <Modal open={open} onClose={() => setOpen(false)}>
+        <Box sx={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: 400,
+          bgcolor: 'background.paper',
+          boxShadow: 24,
+          p: 4,
+          borderRadius: 2
+        }}>
+          {selectedRow && (
+            <>
+              <Typography variant="h5" component="h2" fontWeight="bold">
+                Sell Order Summary
+              </Typography>
+              <Typography>Stock: {selectedRow.stockCode}</Typography>
+              <Typography>CMP: ₹{selectedRow.currentCMP}</Typography>
+              <Typography>Shares: {selectedRow.selectedShares}</Typography>
+              <Typography>Shares to sell: {shareCount}</Typography>
+              
+              <Box display="flex" alignItems="center" marginY={2}>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  onClick={() => setShareCount(prev => Math.max(1, prev - 1))}
+                  sx={{ marginRight: 1 }}
+                >
+                  -1
+                </Button>
+                <Typography>{shareCount}</Typography>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  onClick={() => setShareCount(prev => prev + 1)}
+                  sx={{ marginLeft: 1 }}
+                  disabled={shareCount >= selectedRow.selectedShares}
+
+                >
+                  +1
+                </Button>
+              </Box>
+              
+              <Button variant="contained" color="success" fullWidth onClick={handleConfirmSell}>
+                Confirm Sell
+              </Button>
+            </>
+          )}
+        </Box>
+      </Modal>
     </Box>
   );
 }

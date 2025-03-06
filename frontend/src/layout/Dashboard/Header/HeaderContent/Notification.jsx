@@ -98,7 +98,7 @@ export default function Notification() {
       const minutes = now.getMinutes();
 
       // Market opening time: 9:15 AM
-      if (hours === 1 && minutes === 35) {
+      if (hours === 3 && minutes === 3) {
         addMarketNotification();
       }
     };
